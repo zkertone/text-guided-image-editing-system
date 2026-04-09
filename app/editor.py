@@ -1,3 +1,4 @@
+import csv
 from datetime import datetime
 from pathlib import Path
 
@@ -13,8 +14,10 @@ class ImageEditor:
         project_root = Path(__file__).resolve().parents[1]
         self.input_dir = project_root / "data" / "input"
         self.output_dir = project_root / "data" / "output"
+        self.log_csv_path = project_root / "docs" / "experiment_log.csv"
         self.input_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.log_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
     def preprocess_image(self, input_image: Image.Image) -> Image.Image:
         """Convert input image to RGB and resize it to the demo size."""
@@ -48,6 +51,46 @@ class ImageEditor:
             f"image_size: {self.image_size[0]} x {self.image_size[1]}"
         )
 
+    def _append_experiment_log(
+        self,
+        timestamp: str,
+        prompt: str,
+        num_inference_steps: int,
+        image_guidance_scale: float,
+        guidance_scale: float,
+        input_save_path: Path,
+        output_save_path: Path,
+    ) -> None:
+        """Append one experiment record to docs/experiment_log.csv."""
+        fieldnames = [
+            "timestamp",
+            "prompt",
+            "num_inference_steps",
+            "image_guidance_scale",
+            "guidance_scale",
+            "image_size",
+            "input_save_path",
+            "output_save_path",
+        ]
+
+        row = {
+            "timestamp": timestamp,
+            "prompt": prompt.strip(),
+            "num_inference_steps": int(num_inference_steps),
+            "image_guidance_scale": float(image_guidance_scale),
+            "guidance_scale": float(guidance_scale),
+            "image_size": f"{self.image_size[0]}x{self.image_size[1]}",
+            "input_save_path": str(input_save_path),
+            "output_save_path": str(output_save_path),
+        }
+
+        file_exists = self.log_csv_path.exists()
+        with self.log_csv_path.open("a", newline="", encoding="utf-8") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(row)
+
     def edit_image(
         self,
         input_image: Image.Image,
@@ -65,6 +108,7 @@ class ImageEditor:
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty.")
 
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         image = self.preprocess_image(input_image)
         input_save_path = self._save_image(image, self.input_dir, "input")
 
@@ -77,6 +121,15 @@ class ImageEditor:
         ).images[0]
 
         output_save_path = self._save_image(result, self.output_dir, "output")
+        self._append_experiment_log(
+            timestamp=timestamp,
+            prompt=prompt,
+            num_inference_steps=num_inference_steps,
+            image_guidance_scale=image_guidance_scale,
+            guidance_scale=guidance_scale,
+            input_save_path=input_save_path,
+            output_save_path=output_save_path,
+        )
         summary_text = self._build_summary_text(
             prompt=prompt,
             num_inference_steps=num_inference_steps,

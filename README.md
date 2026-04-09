@@ -193,6 +193,7 @@ http://1.2.3.4:7860
 - 输出编辑后的图像
 - 自动保存预处理后的输入图像到 `data/input/`
 - 自动保存编辑结果到 `data/output/`
+- 自动追加实验记录到 `docs/experiment_log.csv`
 
 ## 9. 模块说明
 
