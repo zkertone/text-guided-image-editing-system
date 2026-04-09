@@ -65,6 +65,10 @@ python -m app.main
 
 运行后会启动 Gradio 本地界面。
 
+如果你希望通过 Google Colab 启动整个项目，可以使用：
+
+- [notebooks/colab_run_project.ipynb](/Users/zjx/Documents/New project/notebooks/colab_run_project.ipynb)
+
 如果你在 Colab 中运行，可以将 `launch()` 参数改成：
 
 ```python
