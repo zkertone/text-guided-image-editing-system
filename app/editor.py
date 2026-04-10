@@ -23,6 +23,20 @@ class ImageEditor:
         """Convert input image to RGB and resize it to the demo size."""
         return input_image.convert("RGB").resize(self.image_size)
 
+    def get_model_name(self) -> str:
+        """Get the current pipeline model name for display."""
+        if hasattr(self.pipeline, "config") and hasattr(self.pipeline.config, "_name_or_path"):
+            return str(self.pipeline.config._name_or_path)
+        return "unknown"
+
+    def get_device_name(self) -> str:
+        """Get the current execution device for display."""
+        if hasattr(self.pipeline, "_execution_device"):
+            return str(self.pipeline._execution_device)
+        if hasattr(self.pipeline, "device"):
+            return str(self.pipeline.device)
+        return "unknown"
+
     def _generate_timestamp(self) -> str:
         """Generate a timestamp-based filename suffix to avoid overwriting."""
         return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -40,15 +54,21 @@ class ImageEditor:
         num_inference_steps: int,
         image_guidance_scale: float,
         guidance_scale: float,
+        input_save_path: Path,
+        output_save_path: Path,
     ) -> str:
         """Build a readable multi-line summary for the current experiment."""
         return (
-            "Experiment Summary\n"
-            f"prompt: {prompt.strip()}\n"
-            f"num_inference_steps: {int(num_inference_steps)}\n"
-            f"image_guidance_scale: {float(image_guidance_scale)}\n"
-            f"guidance_scale: {float(guidance_scale)}\n"
-            f"image_size: {self.image_size[0]} x {self.image_size[1]}"
+            "实验信息摘要\n"
+            f"模型名称: {self.get_model_name()}\n"
+            f"运行设备: {self.get_device_name()}\n"
+            f"编辑指令: {prompt.strip()}\n"
+            f"推理步数: {int(num_inference_steps)}\n"
+            f"图像引导强度: {float(image_guidance_scale)}\n"
+            f"文本引导强度: {float(guidance_scale)}\n"
+            f"图像尺寸: {self.image_size[0]} x {self.image_size[1]}\n"
+            f"输入图保存路径: {input_save_path}\n"
+            f"输出图保存路径: {output_save_path}"
         )
 
     def _append_experiment_log(
@@ -135,11 +155,15 @@ class ImageEditor:
             num_inference_steps=num_inference_steps,
             image_guidance_scale=image_guidance_scale,
             guidance_scale=guidance_scale,
+            input_save_path=input_save_path,
+            output_save_path=output_save_path,
         )
 
         return {
             "result_image": result,
             "input_save_path": str(input_save_path),
             "output_save_path": str(output_save_path),
+            "model_name": self.get_model_name(),
+            "device": self.get_device_name(),
             "summary_text": summary_text,
         }

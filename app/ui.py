@@ -3,6 +3,12 @@ import gradio as gr
 
 def create_ui(image_editor):
     """Create the Gradio interface for the V1 demo."""
+    example_prompts = [
+        "make the hair blonde",
+        "change the background to a beach",
+        "make the sky sunset orange",
+        "make the suit blue",
+    ]
 
     def run_edit(
         input_image,
@@ -12,7 +18,10 @@ def create_ui(image_editor):
         text_guidance,
     ):
         if input_image is None:
-            return None, ""
+            return None, "请先上传一张输入图片。"
+
+        if not prompt or not prompt.strip():
+            return None, "请输入英文编辑指令。"
 
         result = image_editor.edit_image(
             input_image=input_image,
@@ -22,13 +31,7 @@ def create_ui(image_editor):
             guidance_scale=text_guidance,
         )
 
-        info_text = (
-            f"输入图保存路径: {result['input_save_path']}\n"
-            f"输出图保存路径: {result['output_save_path']}\n\n"
-            f"{result['summary_text']}"
-        )
-
-        return result["result_image"], info_text
+        return result["result_image"], result["summary_text"]
 
     demo = gr.Interface(
         fn=run_edit,
@@ -44,10 +47,17 @@ def create_ui(image_editor):
         ],
         outputs=[
             gr.Image(type="pil", label="编辑结果"),
-            gr.Textbox(label="实验信息", lines=10),
+            gr.Textbox(label="实验信息", lines=12),
         ],
         title="文字驱动图像编辑 Demo",
-        description="上传图片并输入英文编辑指令，系统返回编辑后的图像，并展示保存路径与参数摘要。",
+        description=(
+            "上传图片并输入英文编辑指令，系统返回编辑后的图像，并展示实验信息。\n\n"
+            "示例 Prompt：\n"
+            f"1. {example_prompts[0]}\n"
+            f"2. {example_prompts[1]}\n"
+            f"3. {example_prompts[2]}\n"
+            f"4. {example_prompts[3]}"
+        ),
     )
 
     return demo
