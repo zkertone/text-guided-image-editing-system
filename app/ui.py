@@ -11,7 +11,9 @@ def create_ui(image_editor):
     ]
 
     def run_edit(
+        mode,
         input_image,
+        mask_image,
         prompt,
         steps,
         image_guidance,
@@ -23,9 +25,14 @@ def create_ui(image_editor):
         if not prompt or not prompt.strip():
             return None, "请输入英文编辑指令。"
 
+        if mode == "local_inpaint" and mask_image is None:
+            return None, "局部编辑模式下，请上传黑白 mask 图。"
+
         result = image_editor.edit_image(
             input_image=input_image,
             prompt=prompt,
+            mode=mode,
+            mask_image=mask_image,
             num_inference_steps=steps,
             image_guidance_scale=image_guidance,
             guidance_scale=text_guidance,
@@ -36,7 +43,16 @@ def create_ui(image_editor):
     demo = gr.Interface(
         fn=run_edit,
         inputs=[
+            gr.Radio(
+                choices=[
+                    ("整体编辑", "global_edit"),
+                    ("局部编辑", "local_inpaint"),
+                ],
+                value="global_edit",
+                label="编辑模式",
+            ),
             gr.Image(type="pil", label="上传图片"),
+            gr.Image(type="pil", label="上传黑白 Mask 图（白色区域编辑，黑色区域保留）"),
             gr.Textbox(
                 label="编辑指令（英文）",
                 placeholder="例如：make the sky sunset orange",
@@ -51,12 +67,14 @@ def create_ui(image_editor):
         ],
         title="文字驱动图像编辑 Demo",
         description=(
-            "上传图片并输入英文编辑指令，系统返回编辑后的图像，并展示实验信息。\n\n"
+            "上传图片并输入英文编辑指令，系统返回编辑后的图像，并展示实验信息。\n"
+            "支持整体编辑与基于黑白 Mask 图的局部编辑。\n\n"
             "示例 Prompt：\n"
             f"1. {example_prompts[0]}\n"
             f"2. {example_prompts[1]}\n"
             f"3. {example_prompts[2]}\n"
-            f"4. {example_prompts[3]}"
+            f"4. {example_prompts[3]}\n\n"
+            "局部编辑说明：白色区域表示需要编辑，黑色区域表示保持不变。"
         ),
     )
 
