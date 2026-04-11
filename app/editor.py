@@ -128,6 +128,11 @@ class ImageEditor:
         output_save_path: Path,
     ) -> str:
         """Build a readable multi-line summary for the current experiment."""
+        if mode == "local_inpaint":
+            image_guidance_line = "图像引导强度: 该模式未使用"
+        else:
+            image_guidance_line = f"图像引导强度: {float(image_guidance_scale)}"
+
         return (
             "实验信息摘要\n"
             f"编辑模式: {self.get_mode_label(mode)}\n"
@@ -135,7 +140,7 @@ class ImageEditor:
             f"运行设备: {self.get_device_name(mode)}\n"
             f"编辑指令: {prompt.strip()}\n"
             f"推理步数: {int(num_inference_steps)}\n"
-            f"图像引导强度: {float(image_guidance_scale)}\n"
+            f"{image_guidance_line}\n"
             f"文本引导强度: {float(guidance_scale)}\n"
             f"图像尺寸: {self.image_size[0]} x {self.image_size[1]}\n"
             f"输入图保存路径: {input_save_path}\n"

@@ -3,11 +3,17 @@ import gradio as gr
 
 def create_ui(image_editor):
     """Create the Gradio interface for the V1 demo."""
-    example_prompts = [
+    global_example_prompts = [
         "make the hair blonde",
         "change the background to a beach",
         "make the sky sunset orange",
         "make the suit blue",
+    ]
+    local_example_prompts = [
+        "change the hair color to natural blonde",
+        "change the suit color to blue",
+        "change only the selected area to red",
+        "make the masked area darker",
     ]
 
     def run_edit(
@@ -69,12 +75,20 @@ def create_ui(image_editor):
         description=(
             "上传图片并输入英文编辑指令，系统返回编辑后的图像，并展示实验信息。\n"
             "支持整体编辑与基于黑白 Mask 图的局部编辑。\n\n"
-            "示例 Prompt：\n"
-            f"1. {example_prompts[0]}\n"
-            f"2. {example_prompts[1]}\n"
-            f"3. {example_prompts[2]}\n"
-            f"4. {example_prompts[3]}\n\n"
-            "局部编辑说明：白色区域表示需要编辑，黑色区域表示保持不变。"
+            "整体编辑示例 Prompt：\n"
+            f"1. {global_example_prompts[0]}\n"
+            f"2. {global_example_prompts[1]}\n"
+            f"3. {global_example_prompts[2]}\n"
+            f"4. {global_example_prompts[3]}\n\n"
+            "局部编辑使用提示：\n"
+            "1. 白色区域表示需要编辑，黑色区域表示保持不变。\n"
+            "2. 建议先使用较小 mask 区域做测试。\n"
+            "3. 建议使用更具体、更自然的英文 prompt。\n\n"
+            "局部编辑推荐 Prompt：\n"
+            f"1. {local_example_prompts[0]}\n"
+            f"2. {local_example_prompts[1]}\n"
+            f"3. {local_example_prompts[2]}\n"
+            f"4. {local_example_prompts[3]}"
         ),
     )
 
