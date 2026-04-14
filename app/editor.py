@@ -2,6 +2,8 @@ import csv
 from datetime import datetime
 from pathlib import Path
 
+import cv2
+import numpy as np
 from PIL import Image, ImageChops
 
 
@@ -65,6 +67,19 @@ class ImageEditor:
 
         raise ValueError("Unable to extract a valid mask from drawn mask data.")
 
+    def generate_canny_image(
+        self,
+        input_image: Image.Image,
+        low_threshold: int = 100,
+        high_threshold: int = 200,
+    ) -> Image.Image:
+        """Generate a Canny edge image for ControlNet conditioning."""
+        image = self.preprocess_image(input_image)
+        image_array = np.array(image)
+        edges = cv2.Canny(image_array, low_threshold, high_threshold)
+        edges_rgb = np.stack([edges] * 3, axis=2)
+        return Image.fromarray(edges_rgb)
+
     def get_pipeline(self, mode: str):
         """Get the pipeline by current editing mode."""
         if mode not in self.pipelines:
@@ -75,6 +90,8 @@ class ImageEditor:
         """Get a readable label for the current editing mode."""
         if mode == "local_inpaint":
             return "局部编辑"
+        if mode == "controlnet_canny":
+            return "结构保持编辑"
         return "整体编辑"
 
     def get_mask_source_label(self, mask_source: str) -> str:
@@ -83,6 +100,12 @@ class ImageEditor:
             return "上传Mask图"
         if mask_source == "drawn_mask":
             return "在线绘制"
+        return "不适用"
+
+    def get_control_type_label(self, control_type: str) -> str:
+        """Get a readable label for the current control type."""
+        if control_type == "canny":
+            return "Canny"
         return "不适用"
 
     def get_model_name(self, mode: str) -> str:
@@ -117,6 +140,8 @@ class ImageEditor:
         return [
             "mode",
             "mask_source",
+            "control_type",
+            "control_image_path",
             "timestamp",
             "prompt",
             "num_inference_steps",
@@ -149,6 +174,8 @@ class ImageEditor:
                     {
                         "mode": row.get("mode", "global_edit"),
                         "mask_source": row.get("mask_source", "not_applicable"),
+                        "control_type": row.get("control_type", "not_applicable"),
+                        "control_image_path": row.get("control_image_path", ""),
                         "timestamp": row.get("timestamp", ""),
                         "prompt": row.get("prompt", ""),
                         "num_inference_steps": row.get("num_inference_steps", ""),
@@ -164,6 +191,8 @@ class ImageEditor:
         self,
         mode: str,
         mask_source: str,
+        control_type: str,
+        control_image_path: str,
         prompt: str,
         num_inference_steps: int,
         image_guidance_scale: float,
@@ -172,30 +201,38 @@ class ImageEditor:
         output_save_path: Path,
     ) -> str:
         """Build a readable multi-line summary for the current experiment."""
-        if mode == "local_inpaint":
-            image_guidance_line = "图像引导强度: 该模式未使用"
-        else:
+        if mode == "global_edit":
             image_guidance_line = f"图像引导强度: {float(image_guidance_scale)}"
+        else:
+            image_guidance_line = "图像引导强度: 该模式未使用"
 
-        return (
-            "实验信息摘要\n"
-            f"编辑模式: {self.get_mode_label(mode)}\n"
-            f"Mask来源: {self.get_mask_source_label(mask_source)}\n"
-            f"模型名称: {self.get_model_name(mode)}\n"
-            f"运行设备: {self.get_device_name(mode)}\n"
-            f"编辑指令: {prompt.strip()}\n"
-            f"推理步数: {int(num_inference_steps)}\n"
-            f"{image_guidance_line}\n"
-            f"文本引导强度: {float(guidance_scale)}\n"
-            f"图像尺寸: {self.image_size[0]} x {self.image_size[1]}\n"
-            f"输入图保存路径: {input_save_path}\n"
-            f"输出图保存路径: {output_save_path}"
-        )
+        summary_lines = [
+            "实验信息摘要",
+            f"编辑模式: {self.get_mode_label(mode)}",
+            f"Mask来源: {self.get_mask_source_label(mask_source)}",
+            f"模型名称: {self.get_model_name(mode)}",
+            f"运行设备: {self.get_device_name(mode)}",
+            f"编辑指令: {prompt.strip()}",
+            f"推理步数: {int(num_inference_steps)}",
+            image_guidance_line,
+            f"文本引导强度: {float(guidance_scale)}",
+            f"图像尺寸: {self.image_size[0]} x {self.image_size[1]}",
+        ]
+
+        if mode == "controlnet_canny":
+            summary_lines.append(f"控制方式: {self.get_control_type_label(control_type)}")
+            summary_lines.append(f"Canny图保存路径: {control_image_path}")
+
+        summary_lines.append(f"输入图保存路径: {input_save_path}")
+        summary_lines.append(f"输出图保存路径: {output_save_path}")
+        return "\n".join(summary_lines)
 
     def _append_experiment_log(
         self,
         mode: str,
         mask_source: str,
+        control_type: str,
+        control_image_path: str,
         timestamp: str,
         prompt: str,
         num_inference_steps: int,
@@ -209,6 +246,8 @@ class ImageEditor:
         row = {
             "mode": mode,
             "mask_source": mask_source,
+            "control_type": control_type,
+            "control_image_path": control_image_path,
             "timestamp": timestamp,
             "prompt": prompt.strip(),
             "num_inference_steps": int(num_inference_steps),
@@ -251,6 +290,10 @@ class ImageEditor:
         if mode != "local_inpaint":
             mask_source = "not_applicable"
 
+        control_type = "not_applicable"
+        control_image_path = ""
+        control_image = None
+
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         image = self.preprocess_image(input_image)
         input_save_path = self._save_image(image, self.input_dir, "input")
@@ -270,6 +313,16 @@ class ImageEditor:
                 num_inference_steps=int(num_inference_steps),
                 guidance_scale=float(guidance_scale),
             ).images[0]
+        elif mode == "controlnet_canny":
+            control_type = "canny"
+            control_image = self.generate_canny_image(image)
+            control_image_path = str(self._save_image(control_image, self.output_dir, "canny"))
+            result = self.get_pipeline(mode)(
+                prompt=prompt.strip(),
+                image=control_image,
+                num_inference_steps=int(num_inference_steps),
+                guidance_scale=float(guidance_scale),
+            ).images[0]
         else:
             result = self.get_pipeline(mode)(
                 prompt=prompt.strip(),
@@ -283,6 +336,8 @@ class ImageEditor:
         self._append_experiment_log(
             mode=mode,
             mask_source=mask_source,
+            control_type=control_type,
+            control_image_path=control_image_path,
             timestamp=timestamp,
             prompt=prompt,
             num_inference_steps=num_inference_steps,
@@ -294,6 +349,8 @@ class ImageEditor:
         summary_text = self._build_summary_text(
             mode=mode,
             mask_source=mask_source,
+            control_type=control_type,
+            control_image_path=control_image_path,
             prompt=prompt,
             num_inference_steps=num_inference_steps,
             image_guidance_scale=image_guidance_scale,
@@ -304,10 +361,13 @@ class ImageEditor:
 
         return {
             "result_image": result,
+            "control_image": control_image,
+            "control_image_path": control_image_path,
             "input_save_path": str(input_save_path),
             "output_save_path": str(output_save_path),
             "mode": mode,
             "mask_source": mask_source,
+            "control_type": control_type,
             "model_name": self.get_model_name(mode),
             "device": self.get_device_name(mode),
             "summary_text": summary_text,

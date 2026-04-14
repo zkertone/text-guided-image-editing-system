@@ -12,6 +12,7 @@
 
 - 使用预训练 `InstructPix2Pix` 完成文字驱动图像编辑
 - 使用预训练 `Stable Diffusion Inpainting` 实现基于 Mask 的局部编辑
+- 使用 `Canny ControlNet` 实现结构保持编辑
 - 支持用户上传图片并输入编辑指令
 - 使用 Gradio 提供可视化交互界面
 - 支持上传 Mask 图与在线绘制 Mask 两种局部编辑方式
@@ -111,8 +112,9 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 - 上传黑白 Mask 图进行局部编辑
 - 支持在线绘制 Mask 进行局部编辑
 - 输入英文编辑指令
-- 支持“整体编辑”与“局部编辑”两种模式
+- 支持“整体编辑”“局部编辑”“结构保持编辑”三种模式
 - 局部编辑支持“上传Mask图”与“在线绘制Mask”两种来源
+- 结构保持编辑自动生成并展示 Canny 控制图
 - 调整推理步数
 - 调整图像引导强度
 - 调整文本引导强度
@@ -125,11 +127,11 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 
 ### `app/pipeline_loader.py`
 
-负责加载整体编辑与局部编辑所需的预训练管线，并自动选择运行设备。
+负责加载整体编辑、局部编辑与结构保持编辑所需的预训练管线，并自动选择运行设备。
 
 ### `app/editor.py`
 
-负责封装图像预处理、局部 Mask 预处理、编辑推理逻辑与实验日志记录逻辑。
+负责封装图像预处理、局部 Mask 预处理、Canny 图生成、编辑推理逻辑与实验日志记录逻辑。
 
 ### `app/ui.py`
 
@@ -143,10 +145,13 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 
 - 整体编辑模型默认使用：`timbrooks/instruct-pix2pix`
 - 局部编辑模型默认使用：`runwayml/stable-diffusion-inpainting`
+- 结构保持编辑基础模型默认使用：`runwayml/stable-diffusion-v1-5`
+- Canny ControlNet 模型默认使用：`lllyasviel/sd-controlnet-canny`
 - 输入图片会统一缩放到 `512 x 512`
 - 局部编辑时，mask 图会统一缩放到 `512 x 512`
 - 局部编辑时，白色区域表示需要编辑，黑色区域表示保持不变
 - 在线绘制 Mask 时，系统会自动将绘制区域转换为标准黑白 mask
+- 结构保持编辑会自动根据输入图像生成 Canny 边缘图作为控制条件
 - 文本指令建议优先使用英文，以获得更稳定效果
 - 首次运行时会下载模型文件，耗时取决于网络环境
 - 输入图和输出图会自动按时间戳命名保存，避免文件覆盖

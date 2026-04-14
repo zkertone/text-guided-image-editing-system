@@ -15,19 +15,30 @@ def create_ui(image_editor):
         "change only the selected area to red",
         "make the masked area darker",
     ]
+    control_example_prompts = [
+        "make the building more futuristic",
+        "turn the road into a snowy path",
+        "make the room look modern",
+        "change the car to a red sports car",
+    ]
 
     def update_ui_by_mode(mode, mask_source):
         is_local = mode == "local_inpaint"
+        is_control = mode == "controlnet_canny"
         show_upload_mask = is_local and mask_source == "uploaded_mask"
         show_drawn_mask = is_local and mask_source == "drawn_mask"
+        show_image_guidance = mode == "global_edit"
         return (
             gr.update(visible=is_local),
             gr.update(visible=show_upload_mask),
             gr.update(visible=show_drawn_mask),
-            gr.update(visible=not is_local),
-            gr.update(visible=not is_local),
+            gr.update(visible=show_image_guidance),
+            gr.update(visible=show_image_guidance),
+            gr.update(visible=mode == "global_edit"),
             gr.update(visible=is_local),
-            gr.update(visible=is_local),
+            gr.update(visible=is_control),
+            gr.update(visible=is_control),
+            gr.update(visible=is_control),
         )
 
     def sync_editor_image(input_image):
@@ -47,16 +58,16 @@ def create_ui(image_editor):
         text_guidance,
     ):
         if input_image is None:
-            return None, "请先上传一张输入图片。"
+            return None, None, "请先上传一张输入图片。"
 
         if not prompt or not prompt.strip():
-            return None, "请输入英文编辑指令。"
+            return None, None, "请输入英文编辑指令。"
 
         if mode == "local_inpaint":
             if mask_source == "uploaded_mask" and uploaded_mask_image is None:
-                return None, "局部编辑模式下，请上传黑白 Mask 图。"
+                return None, None, "局部编辑模式下，请上传黑白 Mask 图。"
             if mask_source == "drawn_mask" and drawn_mask_data is None:
-                return None, "局部编辑模式下，请先在线绘制 Mask。"
+                return None, None, "局部编辑模式下，请先在线绘制 Mask。"
 
         result = image_editor.edit_image(
             input_image=input_image,
@@ -70,12 +81,12 @@ def create_ui(image_editor):
             guidance_scale=text_guidance,
         )
 
-        return result["result_image"], result["summary_text"]
+        return result["result_image"], result["control_image"], result["summary_text"]
 
     with gr.Blocks() as demo:
         gr.Markdown("# 文字驱动图像编辑 Demo")
         gr.Markdown(
-            "本系统支持整体编辑、上传 Mask 图的局部编辑，以及在线绘制 Mask 的局部编辑。"
+            "本系统支持整体编辑、局部编辑，以及基于 Canny ControlNet 的结构保持编辑。"
         )
 
         with gr.Row():
@@ -84,6 +95,7 @@ def create_ui(image_editor):
                     choices=[
                         ("整体编辑", "global_edit"),
                         ("局部编辑", "local_inpaint"),
+                        ("结构保持编辑", "controlnet_canny"),
                     ],
                     value="global_edit",
                     label="编辑模式",
@@ -165,6 +177,22 @@ def create_ui(image_editor):
                     f"4. {local_example_prompts[3]}",
                     visible=False,
                 )
+                control_help = gr.Markdown(
+                    "### 结构保持编辑如何使用\n"
+                    "1. 选择“结构保持编辑”。\n"
+                    "2. 上传输入图像。\n"
+                    "3. 输入英文编辑指令。\n"
+                    "4. 系统会自动从原图生成 Canny 边缘图。\n"
+                    "5. 使用该边缘图作为 ControlNet 条件输入生成结果。\n\n"
+                    "与整体编辑相比，结构保持编辑更强调保留原图结构轮廓。\n"
+                    "与局部编辑相比，结构保持编辑不需要上传或绘制 Mask。\n\n"
+                    "结构保持编辑示例 Prompt：\n"
+                    f"1. {control_example_prompts[0]}\n"
+                    f"2. {control_example_prompts[1]}\n"
+                    f"3. {control_example_prompts[2]}\n"
+                    f"4. {control_example_prompts[3]}",
+                    visible=False,
+                )
                 mask_area_help = gr.Markdown(
                     "### Mask 区域说明\n"
                     "当前处于局部编辑模式。\n"
@@ -173,8 +201,21 @@ def create_ui(image_editor):
                     "- 上传 Mask 图与在线绘制 Mask 都会统一转换为标准黑白 Mask 后进入 Inpainting 流程。",
                     visible=False,
                 )
+                canny_help = gr.Markdown(
+                    "### Canny 控制图说明\n"
+                    "当前处于结构保持编辑模式。\n"
+                    "- 系统会根据输入图像自动提取边缘结构。\n"
+                    "- Canny 控制图用于增强生成结果与原始结构的一致性。\n"
+                    "- 该模式更适合在保留场景结构的前提下做内容变化。",
+                    visible=False,
+                )
+                canny_preview = gr.Image(
+                    type="pil",
+                    label="Canny 控制图",
+                    visible=False,
+                )
                 output_image = gr.Image(type="pil", label="输出结果")
-                info_text = gr.Textbox(label="实验信息", lines=13)
+                info_text = gr.Textbox(label="实验信息", lines=15)
 
         mode.change(
             fn=update_ui_by_mode,
@@ -187,11 +228,14 @@ def create_ui(image_editor):
                 image_guidance,
                 overall_help,
                 local_help,
+                control_help,
+                mask_area_help,
+                canny_help,
             ],
         ).then(
-            fn=lambda selected_mode: gr.update(visible=selected_mode == "local_inpaint"),
+            fn=lambda selected_mode: gr.update(visible=selected_mode == "controlnet_canny"),
             inputs=mode,
-            outputs=mask_area_help,
+            outputs=canny_preview,
         )
 
         mask_source.change(
@@ -205,11 +249,10 @@ def create_ui(image_editor):
                 image_guidance,
                 overall_help,
                 local_help,
+                control_help,
+                mask_area_help,
+                canny_help,
             ],
-        ).then(
-            fn=lambda selected_mode: gr.update(visible=selected_mode == "local_inpaint"),
-            inputs=mode,
-            outputs=mask_area_help,
         )
 
         input_image.change(
@@ -231,7 +274,7 @@ def create_ui(image_editor):
                 image_guidance,
                 text_guidance,
             ],
-            outputs=[output_image, info_text],
+            outputs=[output_image, canny_preview, info_text],
         )
 
     return demo
