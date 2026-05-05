@@ -151,6 +151,54 @@ button:hover {
   max-height: 220px;
 }
 
+.draw-mask-panel {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.draw-area {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #bcccdc;
+  border-radius: 6px;
+  background: #111827;
+}
+
+.draw-area img {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+}
+
+.draw-area canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.draw-tools {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 140px;
+  gap: 12px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.draw-tools label {
+  margin: 0;
+}
+
+.draw-tools button {
+  margin-top: 0;
+}
+
 .summary {
   min-height: 120px;
   padding: 12px;
@@ -226,6 +274,7 @@ tr:hover {
   .grid,
   .result-grid,
   .history-images,
+  .draw-tools,
   .inline-form {
     grid-template-columns: 1fr;
   }

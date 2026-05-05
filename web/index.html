@@ -42,10 +42,36 @@
           </label>
           <img id="currentInputPreview" class="preview" alt="当前输入图预览" />
 
+          <label id="maskSourceField" class="hidden">
+            Mask 来源
+            <select id="maskSource" name="mask_source">
+              <option value="uploaded_mask">上传 Mask 图</option>
+              <option value="drawn_mask">在线绘制 Mask</option>
+            </select>
+          </label>
+
           <label id="maskField" class="hidden">
             Mask 图像
             <input id="maskInput" name="mask_image" type="file" accept="image/*" />
           </label>
+
+          <div id="drawMaskPanel" class="draw-mask-panel hidden">
+            <h3>在线绘制 Mask</h3>
+            <p class="hint">在原图上涂抹需要编辑的区域。白色区域表示需要编辑，黑色区域表示保持不变。</p>
+            <div class="draw-area" id="drawArea">
+              <img id="drawBaseImage" alt="在线绘制原图" />
+              <canvas id="drawCanvas"></canvas>
+            </div>
+            <div class="draw-tools">
+              <label>
+                画笔大小
+                <input id="brushSize" type="range" min="5" max="80" value="28" />
+              </label>
+              <button id="clearMaskButton" type="button">清空 Mask</button>
+            </div>
+            <h3>Mask 预览</h3>
+            <img id="maskPreview" class="preview" alt="在线绘制 Mask 预览" />
+          </div>
 
           <label>
             Prompt

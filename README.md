@@ -165,6 +165,15 @@ https://xxxx.trycloudflare.com
 
 前端会将该地址保存到浏览器 `localStorage` 中，页面刷新后仍会继续使用上次保存的后端地址。这样 Colab 重新启动后，只需要在页面中更新新的 cloudflared 地址，不需要再修改 `web/app.js`。
 
+### 6.2 Web 在线绘制 Mask 说明
+
+在 Web 用户端选择“局部编辑”后，可以在“Mask 来源”中选择：
+
+- `上传 Mask 图`：上传提前准备好的黑白 Mask 图
+- `在线绘制 Mask`：直接在输入图像预览上涂抹需要编辑的区域
+
+在线绘制 Mask 时，前端会使用 Canvas 生成黑白 Mask 图，并作为 `mask_image` 提交给 FastAPI 后端。白色区域表示需要编辑，黑色区域表示保持不变。后端继续复用现有 Inpainting 局部编辑流程。
+
 ## 7. 当前 V1 功能
 
 - 上传输入图像
@@ -174,7 +183,7 @@ https://xxxx.trycloudflare.com
 - 支持“整体编辑”“局部编辑”“结构保持编辑”三种模式
 - 局部编辑支持“上传Mask图”与“在线绘制Mask”两种来源
 - 结构保持编辑自动生成并展示 Canny 控制图
-- Web 用户端支持整体编辑、上传 Mask 局部编辑和 Canny ControlNet 结构保持编辑
+- Web 用户端支持整体编辑、上传 Mask 局部编辑、在线绘制 Mask 局部编辑和 Canny ControlNet 结构保持编辑
 - 调整推理步数
 - 调整图像引导强度
 - 调整文本引导强度
@@ -222,7 +231,7 @@ FastAPI 服务端入口，负责初始化数据库、加载模型管线，并向
 
 ### `web/`
 
-原生 HTML/CSS/JavaScript 用户端，支持整体编辑、上传 Mask 局部编辑、结构保持编辑、历史记录查看、图片组查看和逻辑删除。
+原生 HTML/CSS/JavaScript 用户端，支持整体编辑、上传 Mask 局部编辑、在线绘制 Mask 局部编辑、结构保持编辑、历史记录查看、图片组查看和逻辑删除。
 
 ## 9. 注意事项
 
@@ -231,11 +240,11 @@ FastAPI 服务端入口，负责初始化数据库、加载模型管线，并向
 - 结构保持编辑基础模型默认使用：`runwayml/stable-diffusion-v1-5`
 - Canny ControlNet 模型默认使用：`lllyasviel/sd-controlnet-canny`
 - Gradio 原型仍然保留，V2.0 Web 用户端是新增前后端版本
-- 当前 Web 用户端暂不实现在线绘制 Mask，局部编辑先支持上传 Mask 图
+- Web 用户端局部编辑支持上传 Mask 图与在线绘制 Mask 两种方式
 - 输入图片会统一缩放到 `512 x 512`
 - 局部编辑时，mask 图会统一缩放到 `512 x 512`
 - 局部编辑时，白色区域表示需要编辑，黑色区域表示保持不变
-- 在线绘制 Mask 时，系统会自动将绘制区域转换为标准黑白 mask
+- Web 在线绘制 Mask 时，前端会在原图预览上叠加 Canvas 画布，并自动将涂抹区域转换为标准黑白 Mask 图后提交给后端 Inpainting 模型
 - 结构保持编辑会自动根据输入图像生成 Canny 边缘图作为控制条件
 - 文本指令建议优先使用英文，以获得更稳定效果
 - 首次运行时会下载模型文件，耗时取决于网络环境

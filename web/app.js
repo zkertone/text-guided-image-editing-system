@@ -5,6 +5,9 @@ let apiBase = normalizeApiBase(
 
 let loadedImageBlob = null;
 let loadedImageName = "history_input.png";
+let isDrawingMask = false;
+let hasDrawnMask = false;
+let lastDrawPoint = null;
 
 const elements = {
   serverStatus: document.getElementById("serverStatus"),
@@ -16,6 +19,15 @@ const elements = {
   imageInput: document.getElementById("imageInput"),
   maskInput: document.getElementById("maskInput"),
   maskField: document.getElementById("maskField"),
+  maskSource: document.getElementById("maskSource"),
+  maskSourceField: document.getElementById("maskSourceField"),
+  drawMaskPanel: document.getElementById("drawMaskPanel"),
+  drawArea: document.getElementById("drawArea"),
+  drawBaseImage: document.getElementById("drawBaseImage"),
+  drawCanvas: document.getElementById("drawCanvas"),
+  brushSize: document.getElementById("brushSize"),
+  clearMaskButton: document.getElementById("clearMaskButton"),
+  maskPreview: document.getElementById("maskPreview"),
   prompt: document.getElementById("prompt"),
   steps: document.getElementById("steps"),
   imageGuidance: document.getElementById("imageGuidance"),
@@ -68,9 +80,159 @@ function setImage(img, url) {
 
 function updateModeControls() {
   const mode = elements.mode.value;
-  elements.maskField.classList.toggle("hidden", mode !== "local_inpaint");
+  const isLocalMode = mode === "local_inpaint";
+  const isDrawnMask = elements.maskSource.value === "drawn_mask";
+
+  elements.maskSourceField.classList.toggle("hidden", !isLocalMode);
+  elements.maskField.classList.toggle("hidden", !isLocalMode || isDrawnMask);
+  elements.drawMaskPanel.classList.toggle("hidden", !isLocalMode || !isDrawnMask);
   elements.imageGuidanceField.classList.toggle("hidden", mode !== "global_edit");
   elements.controlBlock.classList.toggle("hidden", mode !== "controlnet_canny");
+
+  if (isLocalMode && isDrawnMask) {
+    syncDrawImageFromCurrentInput();
+  }
+}
+
+function setCurrentInputPreview(url) {
+  elements.currentInputPreview.src = url;
+  elements.drawBaseImage.src = url;
+}
+
+function getCanvasPoint(event) {
+  const rect = elements.drawCanvas.getBoundingClientRect();
+  const scaleX = elements.drawCanvas.width / rect.width;
+  const scaleY = elements.drawCanvas.height / rect.height;
+
+  return {
+    x: (event.clientX - rect.left) * scaleX,
+    y: (event.clientY - rect.top) * scaleY,
+  };
+}
+
+function prepareDrawCanvas() {
+  const width = elements.drawBaseImage.naturalWidth;
+  const height = elements.drawBaseImage.naturalHeight;
+
+  if (!width || !height) {
+    return;
+  }
+
+  elements.drawCanvas.width = width;
+  elements.drawCanvas.height = height;
+  clearDrawnMask();
+}
+
+function drawMaskStroke(fromPoint, toPoint) {
+  const context = elements.drawCanvas.getContext("2d");
+  const brushSize = Number(elements.brushSize.value);
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.strokeStyle = "rgba(255, 64, 64, 0.55)";
+  context.fillStyle = "rgba(255, 64, 64, 0.55)";
+  context.lineWidth = brushSize;
+  context.beginPath();
+  context.moveTo(fromPoint.x, fromPoint.y);
+  context.lineTo(toPoint.x, toPoint.y);
+  context.stroke();
+
+  if (fromPoint.x === toPoint.x && fromPoint.y === toPoint.y) {
+    context.beginPath();
+    context.arc(toPoint.x, toPoint.y, brushSize / 2, 0, Math.PI * 2);
+    context.fill();
+  }
+}
+
+function startMaskDrawing(event) {
+  if (elements.drawCanvas.width === 0 || elements.drawCanvas.height === 0) {
+    return;
+  }
+
+  event.preventDefault();
+  isDrawingMask = true;
+  hasDrawnMask = true;
+  lastDrawPoint = getCanvasPoint(event);
+  drawMaskStroke(lastDrawPoint, lastDrawPoint);
+}
+
+function continueMaskDrawing(event) {
+  if (!isDrawingMask || !lastDrawPoint) {
+    return;
+  }
+
+  event.preventDefault();
+  const currentPoint = getCanvasPoint(event);
+  drawMaskStroke(lastDrawPoint, currentPoint);
+  lastDrawPoint = currentPoint;
+}
+
+function stopMaskDrawing() {
+  if (!isDrawingMask) {
+    return;
+  }
+
+  isDrawingMask = false;
+  lastDrawPoint = null;
+  updateMaskPreview();
+}
+
+function clearDrawnMask() {
+  const context = elements.drawCanvas.getContext("2d");
+  context.clearRect(0, 0, elements.drawCanvas.width, elements.drawCanvas.height);
+  hasDrawnMask = false;
+  updateMaskPreview();
+}
+
+function buildBlackWhiteMaskCanvas() {
+  const maskCanvas = document.createElement("canvas");
+  maskCanvas.width = elements.drawCanvas.width;
+  maskCanvas.height = elements.drawCanvas.height;
+
+  const maskContext = maskCanvas.getContext("2d");
+  maskContext.fillStyle = "black";
+  maskContext.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+  if (hasDrawnMask) {
+    const drawContext = elements.drawCanvas.getContext("2d");
+    const drawImageData = drawContext.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+    const maskImageData = maskContext.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+    const drawData = drawImageData.data;
+    const maskData = maskImageData.data;
+
+    for (let index = 0; index < maskData.length; index += 4) {
+      const alpha = drawData[index + 3];
+      const value = alpha > 0 ? 255 : 0;
+      maskData[index] = value;
+      maskData[index + 1] = value;
+      maskData[index + 2] = value;
+      maskData[index + 3] = 255;
+    }
+
+    maskContext.putImageData(maskImageData, 0, 0);
+  }
+
+  return maskCanvas;
+}
+
+function updateMaskPreview() {
+  if (elements.drawCanvas.width === 0 || elements.drawCanvas.height === 0) {
+    elements.maskPreview.removeAttribute("src");
+    return;
+  }
+
+  elements.maskPreview.src = buildBlackWhiteMaskCanvas().toDataURL("image/png");
+}
+
+function canvasToPngBlob(canvas) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/png");
+  });
+}
+
+function syncDrawImageFromCurrentInput() {
+  if (elements.currentInputPreview.src) {
+    elements.drawBaseImage.src = elements.currentInputPreview.src;
+  }
 }
 
 async function fetchJson(path, options = {}) {
@@ -183,12 +345,29 @@ async function submitEdit(event) {
   }
 
   if (mode === "local_inpaint") {
-    const maskFile = elements.maskInput.files[0];
-    if (!maskFile) {
-      elements.summaryText.textContent = "局部编辑模式下，请上传 Mask 图。";
-      return;
+    if (elements.maskSource.value === "drawn_mask") {
+      if (!hasDrawnMask) {
+        elements.summaryText.textContent = "局部编辑模式下，请先在线绘制 Mask 区域。";
+        return;
+      }
+
+      const maskBlob = await canvasToPngBlob(buildBlackWhiteMaskCanvas());
+      if (!maskBlob) {
+        elements.summaryText.textContent = "Mask 生成失败，请重新绘制后再试。";
+        return;
+      }
+
+      formData.append("mask_image", maskBlob, "drawn_mask.png");
+      formData.append("mask_source", "drawn_mask");
+    } else {
+      const maskFile = elements.maskInput.files[0];
+      if (!maskFile) {
+        elements.summaryText.textContent = "局部编辑模式下，请上传 Mask 图，或切换为在线绘制 Mask。";
+        return;
+      }
+      formData.append("mask_image", maskFile);
+      formData.append("mask_source", "uploaded_mask");
     }
-    formData.append("mask_image", maskFile);
   }
 
   formData.append("mode", mode);
@@ -251,7 +430,7 @@ async function loadInputImage() {
     }
     loadedImageBlob = await response.blob();
     loadedImageName = `history_input_${imageId}.png`;
-    elements.currentInputPreview.src = URL.createObjectURL(loadedImageBlob);
+    setCurrentInputPreview(URL.createObjectURL(loadedImageBlob));
     elements.loadedImageHint.textContent = `已加载历史输入图，image_id=${imageId}`;
   } catch (error) {
     elements.loadedImageHint.textContent = `加载失败: ${error.message}`;
@@ -292,16 +471,23 @@ async function deleteImage() {
 }
 
 elements.mode.addEventListener("change", updateModeControls);
+elements.maskSource.addEventListener("change", updateModeControls);
 elements.saveApiBaseButton.addEventListener("click", saveApiBase);
 elements.testApiBaseButton.addEventListener("click", testApiBase);
 elements.imageInput.addEventListener("change", () => {
   const file = elements.imageInput.files[0];
   loadedImageBlob = null;
   if (file) {
-    elements.currentInputPreview.src = URL.createObjectURL(file);
+    setCurrentInputPreview(URL.createObjectURL(file));
     elements.loadedImageHint.textContent = "";
   }
 });
+elements.drawBaseImage.addEventListener("load", prepareDrawCanvas);
+elements.drawCanvas.addEventListener("pointerdown", startMaskDrawing);
+elements.drawCanvas.addEventListener("pointermove", continueMaskDrawing);
+elements.drawCanvas.addEventListener("pointerup", stopMaskDrawing);
+elements.drawCanvas.addEventListener("pointerleave", stopMaskDrawing);
+elements.clearMaskButton.addEventListener("click", clearDrawnMask);
 elements.editForm.addEventListener("submit", submitEdit);
 elements.viewRecordButton.addEventListener("click", () => viewRecord());
 elements.loadInputButton.addEventListener("click", loadInputImage);
@@ -311,5 +497,5 @@ elements.deleteImageButton.addEventListener("click", deleteImage);
 elements.apiBaseInput.value = apiBase;
 updateModeControls();
 checkHealth();
-refreshHistory();
-refreshInputImages();
+refreshHistory().catch(() => {});
+refreshInputImages().catch(() => {});
