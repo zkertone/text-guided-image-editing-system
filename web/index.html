@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>文字驱动图像编辑系统</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>文字驱动图像编辑系统</h1>
+        <p>当前用户：demo_user</p>
+      </div>
+      <div class="status" id="serverStatus">后端状态：检查中</div>
+    </header>
+
+    <main class="layout">
+      <section class="panel">
+        <h2>图像编辑</h2>
+        <form id="editForm">
+          <label>
+            编辑模式
+            <select id="mode" name="mode">
+              <option value="global_edit">整体编辑</option>
+              <option value="local_inpaint">局部编辑</option>
+              <option value="controlnet_canny">结构保持编辑</option>
+            </select>
+          </label>
+
+          <label>
+            输入图像
+            <input id="imageInput" name="image" type="file" accept="image/*" />
+          </label>
+          <img id="currentInputPreview" class="preview" alt="当前输入图预览" />
+
+          <label id="maskField" class="hidden">
+            Mask 图像
+            <input id="maskInput" name="mask_image" type="file" accept="image/*" />
+          </label>
+
+          <label>
+            Prompt
+            <textarea id="prompt" name="prompt" rows="3" placeholder="例如：make the sky sunset orange"></textarea>
+          </label>
+
+          <div class="grid">
+            <label>
+              推理步数
+              <input id="steps" name="num_inference_steps" type="number" value="20" min="10" max="40" />
+            </label>
+            <label id="imageGuidanceField">
+              图像引导强度
+              <input id="imageGuidance" name="image_guidance_scale" type="number" value="1.5" min="1" max="2.5" step="0.1" />
+            </label>
+            <label>
+              文本引导强度
+              <input id="guidance" name="guidance_scale" type="number" value="7.5" min="5" max="10" step="0.5" />
+            </label>
+          </div>
+
+          <button type="submit" id="editButton">开始编辑</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>结果展示</h2>
+        <div class="result-grid">
+          <div>
+            <h3>输出图</h3>
+            <img id="outputImage" class="image-box" alt="输出图" />
+          </div>
+          <div id="controlBlock" class="hidden">
+            <h3>Canny 控制图</h3>
+            <img id="controlImage" class="image-box" alt="Canny 控制图" />
+          </div>
+        </div>
+        <h3>实验信息</h3>
+        <pre id="summaryText" class="summary"></pre>
+      </section>
+
+      <section class="panel wide">
+        <h2>最近编辑记录</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>时间</th>
+              <th>模式</th>
+              <th>Prompt</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </section>
+
+      <section class="panel wide">
+        <h2>历史记录查看</h2>
+        <div class="inline-form">
+          <input id="recordIdInput" type="number" placeholder="输入 record_id" />
+          <button id="viewRecordButton">查看记录</button>
+        </div>
+        <pre id="recordDetail" class="summary"></pre>
+        <div class="history-images">
+          <div>
+            <h3>输入图</h3>
+            <img id="historyInputImage" class="image-box" alt="历史输入图" />
+          </div>
+          <div>
+            <h3>Mask 图</h3>
+            <img id="historyMaskImage" class="image-box" alt="历史 Mask 图" />
+          </div>
+          <div>
+            <h3>Canny 图</h3>
+            <img id="historyControlImage" class="image-box" alt="历史 Canny 图" />
+          </div>
+          <div>
+            <h3>输出图</h3>
+            <img id="historyOutputImage" class="image-box" alt="历史输出图" />
+          </div>
+        </div>
+      </section>
+
+      <section class="panel wide">
+        <h2>历史输入图复用</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>文件名</th>
+              <th>时间</th>
+              <th>宽</th>
+              <th>高</th>
+            </tr>
+          </thead>
+          <tbody id="inputImagesBody"></tbody>
+        </table>
+        <div class="inline-form">
+          <input id="loadImageIdInput" type="number" placeholder="输入 image_id" />
+          <button id="loadInputButton">加载为当前输入图</button>
+        </div>
+        <p id="loadedImageHint" class="hint"></p>
+      </section>
+
+      <section class="panel wide">
+        <h2>逻辑删除</h2>
+        <div class="inline-form">
+          <input id="deleteRecordIdInput" type="number" placeholder="删除 record_id" />
+          <button id="deleteRecordButton">删除记录</button>
+          <input id="deleteImageIdInput" type="number" placeholder="删除 image_id" />
+          <button id="deleteImageButton">删除图片</button>
+        </div>
+        <p id="deleteStatus" class="hint"></p>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

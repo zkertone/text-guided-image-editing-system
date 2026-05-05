@@ -15,6 +15,8 @@
 - 使用 `Canny ControlNet` 实现结构保持编辑
 - 支持用户上传图片并输入编辑指令
 - 使用 Gradio 提供可视化交互界面
+- 使用 FastAPI 提供 Web 服务接口
+- 使用原生 HTML/CSS/JavaScript 提供 Web 用户端
 - 支持上传 Mask 图与在线绘制 Mask 两种局部编辑方式
 - 使用 SQLite 保存图片 BLOB 与编辑记录
 - 支持查看历史记录图片组、复用历史输入图和逻辑删除记录
@@ -36,9 +38,14 @@ text-guided-image-editing-system/
 │  ├─ database.py
 │  ├─ history_manager.py
 │  ├─ main.py
+│  ├─ server.py
 │  ├─ pipeline_loader.py
 │  ├─ editor.py
 │  └─ ui.py
+├─ web/
+│  ├─ index.html
+│  ├─ style.css
+│  └─ app.js
 ├─ data/
 │  ├─ database/
 │  ├─ input/
@@ -65,6 +72,8 @@ pip install -r requirements.txt
 
 ## 4. 本地运行方式
 
+### 4.1 Gradio 原型运行
+
 在项目根目录下执行：
 
 ```bash
@@ -76,6 +85,26 @@ python -m app.main
 如果你希望通过 Google Colab 启动整个项目，可以使用：
 
 - [notebooks/colab_run_project.ipynb](/Users/zjx/Documents/New project/notebooks/colab_run_project.ipynb)
+
+### 4.2 FastAPI + Web 用户端运行
+
+启动后端服务：
+
+```bash
+uvicorn app.server:app --host 0.0.0.0 --port 8000
+```
+
+启动前端页面：
+
+```bash
+python -m http.server 5500 -d web
+```
+
+浏览器访问：
+
+```text
+http://localhost:5500
+```
 
 ## 5. Git 管理建议
 
@@ -111,6 +140,14 @@ python -m app.main
 GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 ```
 
+如果运行 V2.0 Web 版本，可启动 FastAPI 后端：
+
+```bash
+uvicorn app.server:app --host 0.0.0.0 --port 8000
+```
+
+前端可以部署在本地或普通 Web 服务器中，并通过 API 地址访问后端。
+
 ## 7. 当前 V1 功能
 
 - 上传输入图像
@@ -120,6 +157,7 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 - 支持“整体编辑”“局部编辑”“结构保持编辑”三种模式
 - 局部编辑支持“上传Mask图”与“在线绘制Mask”两种来源
 - 结构保持编辑自动生成并展示 Canny 控制图
+- Web 用户端支持整体编辑、上传 Mask 局部编辑和 Canny ControlNet 结构保持编辑
 - 调整推理步数
 - 调整图像引导强度
 - 调整文本引导强度
@@ -132,6 +170,7 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 - 支持按记录 ID 查看历史输入图、Mask 图、Canny 控制图和输出图
 - 支持按图片 ID 将历史输入图加载为当前输入图
 - 支持对编辑记录和图片进行逻辑删除
+- FastAPI 服务端提供编辑、图片读取、历史记录查询和逻辑删除接口
 
 ## 8. 模块说明
 
@@ -159,12 +198,22 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 
 项目主入口，负责初始化模型、编辑器和界面。
 
+### `app/server.py`
+
+FastAPI 服务端入口，负责初始化数据库、加载模型管线，并向 Web 前端提供编辑、图片读取、历史记录查询和逻辑删除接口。
+
+### `web/`
+
+原生 HTML/CSS/JavaScript 用户端，支持整体编辑、上传 Mask 局部编辑、结构保持编辑、历史记录查看、图片组查看和逻辑删除。
+
 ## 9. 注意事项
 
 - 整体编辑模型默认使用：`timbrooks/instruct-pix2pix`
 - 局部编辑模型默认使用：`runwayml/stable-diffusion-inpainting`
 - 结构保持编辑基础模型默认使用：`runwayml/stable-diffusion-v1-5`
 - Canny ControlNet 模型默认使用：`lllyasviel/sd-controlnet-canny`
+- Gradio 原型仍然保留，V2.0 Web 用户端是新增前后端版本
+- 当前 Web 用户端暂不实现在线绘制 Mask，局部编辑先支持上传 Mask 图
 - 输入图片会统一缩放到 `512 x 512`
 - 局部编辑时，mask 图会统一缩放到 `512 x 512`
 - 局部编辑时，白色区域表示需要编辑，黑色区域表示保持不变
@@ -176,4 +225,5 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 - SQLite 数据库文件默认保存到 `data/database/app.db`
 - 数据库记录与 CSV 实验日志并存，CSV 仍保留用于实验整理
 - 删除记录和删除图片均采用逻辑删除，不会物理移除 SQLite 中的记录
+- Colab 可用于运行后端 GPU 推理，前端可运行在本地或普通云服务器中
 - 服务器部署阶段建议优先使用 GPU 环境，CPU 仅适合基础验证

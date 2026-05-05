@@ -118,6 +118,19 @@ class HistoryManager:
 
     def get_recent_records(self, limit: int = 10) -> list[list]:
         """Return recent edit records for display in Gradio."""
+        return [
+            [
+                record["id"],
+                record["created_at"],
+                record["mode"],
+                record["prompt"],
+                record["status"],
+            ]
+            for record in self.get_recent_record_dicts(limit=limit)
+        ]
+
+    def get_recent_record_dicts(self, limit: int = 10) -> list[dict]:
+        """Return recent non-deleted edit records as dictionaries."""
         with get_connection() as connection:
             rows = connection.execute(
                 """
@@ -130,19 +143,23 @@ class HistoryManager:
                 (self.user_id, int(limit)),
             ).fetchall()
 
-        return [
-            [
-                row["id"],
-                row["created_at"],
-                row["mode"],
-                row["prompt"],
-                row["status"],
-            ]
-            for row in rows
-        ]
+        return [dict(row) for row in rows]
 
     def get_recent_input_images(self, limit: int = 10) -> list[list]:
         """Return recent non-deleted input images for display in Gradio."""
+        return [
+            [
+                image["id"],
+                image["file_name"],
+                image["created_at"],
+                image["width"],
+                image["height"],
+            ]
+            for image in self.get_recent_input_image_dicts(limit=limit)
+        ]
+
+    def get_recent_input_image_dicts(self, limit: int = 10) -> list[dict]:
+        """Return recent non-deleted input images as dictionaries."""
         with get_connection() as connection:
             rows = connection.execute(
                 """
@@ -157,16 +174,7 @@ class HistoryManager:
                 (self.user_id, int(limit)),
             ).fetchall()
 
-        return [
-            [
-                row["id"],
-                row["file_name"],
-                row["created_at"],
-                row["width"],
-                row["height"],
-            ]
-            for row in rows
-        ]
+        return [dict(row) for row in rows]
 
     def get_record_detail(self, record_id: int) -> Optional[dict]:
         """Return one non-deleted edit record as a dictionary."""
@@ -219,6 +227,13 @@ class HistoryManager:
 
     def load_image(self, image_id: int) -> Image.Image:
         """Load an image BLOB from SQLite as a PIL image."""
+        image_data = self.load_image_bytes(image_id)
+        image = Image.open(BytesIO(image_data)).convert("RGB")
+        image.load()
+        return image
+
+    def load_image_bytes(self, image_id: int) -> bytes:
+        """Load image PNG bytes from SQLite."""
         with get_connection() as connection:
             row = connection.execute(
                 """
@@ -232,9 +247,7 @@ class HistoryManager:
         if row is None:
             raise ValueError(f"Image not found: {image_id}")
 
-        image = Image.open(BytesIO(row["image_data"])).convert("RGB")
-        image.load()
-        return image
+        return bytes(row["image_data"])
 
     def soft_delete_record(self, record_id: int) -> bool:
         """Mark one edit record as deleted without removing it physically."""

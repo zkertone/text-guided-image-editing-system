@@ -9,3 +9,6 @@ gradio
 opencv-python
 Pillow
 matplotlib
+fastapi
+uvicorn
+python-multipart
