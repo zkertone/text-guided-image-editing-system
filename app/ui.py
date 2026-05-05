@@ -57,17 +57,19 @@ def create_ui(image_editor):
         image_guidance,
         text_guidance,
     ):
+        recent_records = image_editor.get_recent_records()
+
         if input_image is None:
-            return None, None, "请先上传一张输入图片。"
+            return None, None, "请先上传一张输入图片。", recent_records
 
         if not prompt or not prompt.strip():
-            return None, None, "请输入英文编辑指令。"
+            return None, None, "请输入英文编辑指令。", recent_records
 
         if mode == "local_inpaint":
             if mask_source == "uploaded_mask" and uploaded_mask_image is None:
-                return None, None, "局部编辑模式下，请上传黑白 Mask 图。"
+                return None, None, "局部编辑模式下，请上传黑白 Mask 图。", recent_records
             if mask_source == "drawn_mask" and drawn_mask_data is None:
-                return None, None, "局部编辑模式下，请先在线绘制 Mask。"
+                return None, None, "局部编辑模式下，请先在线绘制 Mask。", recent_records
 
         result = image_editor.edit_image(
             input_image=input_image,
@@ -81,7 +83,12 @@ def create_ui(image_editor):
             guidance_scale=text_guidance,
         )
 
-        return result["result_image"], result["control_image"], result["summary_text"]
+        return (
+            result["result_image"],
+            result["control_image"],
+            result["summary_text"],
+            image_editor.get_recent_records(),
+        )
 
     with gr.Blocks() as demo:
         gr.Markdown("# 文字驱动图像编辑 Demo")
@@ -216,6 +223,15 @@ def create_ui(image_editor):
                 )
                 output_image = gr.Image(type="pil", label="输出结果")
                 info_text = gr.Textbox(label="实验信息", lines=15)
+                recent_records = gr.Dataframe(
+                    headers=["id", "created_at", "mode", "prompt", "status"],
+                    value=image_editor.get_recent_records(),
+                    datatype=["number", "str", "str", "str", "str"],
+                    row_count=(10, "fixed"),
+                    col_count=(5, "fixed"),
+                    label="最近编辑记录",
+                    interactive=False,
+                )
 
         mode.change(
             fn=update_ui_by_mode,
@@ -274,7 +290,7 @@ def create_ui(image_editor):
                 image_guidance,
                 text_guidance,
             ],
-            outputs=[output_image, canny_preview, info_text],
+            outputs=[output_image, canny_preview, info_text, recent_records],
         )
 
     return demo

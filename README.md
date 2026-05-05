@@ -16,10 +16,11 @@
 - 支持用户上传图片并输入编辑指令
 - 使用 Gradio 提供可视化交互界面
 - 支持上传 Mask 图与在线绘制 Mask 两种局部编辑方式
+- 使用 SQLite 保存图片 BLOB 与编辑记录
 - 将实验 notebook 中已验证的代码整理为清晰的工程结构
 
 说明：
-当前版本聚焦课程题目相关功能，不包含 ControlNet、数据库或用户系统等扩展模块。
+当前版本聚焦课程题目相关功能，仅包含 SQLite 基础数据记录，不包含用户登录、权限管理或复杂后台服务。
 
 ## 2. 项目结构
 
@@ -31,11 +32,14 @@ text-guided-image-editing-system/
 ├─ notebooks/
 ├─ app/
 │  ├─ __init__.py
+│  ├─ database.py
+│  ├─ history_manager.py
 │  ├─ main.py
 │  ├─ pipeline_loader.py
 │  ├─ editor.py
 │  └─ ui.py
 ├─ data/
+│  ├─ database/
 │  ├─ input/
 │  └─ output/
 └─ docs/
@@ -122,8 +126,18 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 - 自动保存预处理后的输入图像到 `data/input/`
 - 自动保存编辑结果到 `data/output/`
 - 自动追加实验记录到 `docs/experiment_log.csv`
+- 自动将图片 BLOB 和编辑任务记录保存到 `data/database/app.db`
+- 在界面中展示最近 10 条编辑记录
 
 ## 8. 模块说明
+
+### `app/database.py`
+
+负责 SQLite 数据库连接、数据表创建和默认用户初始化。
+
+### `app/history_manager.py`
+
+负责将图片保存到数据库、记录编辑任务以及查询最近编辑记录。
 
 ### `app/pipeline_loader.py`
 
@@ -155,4 +169,6 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 - 文本指令建议优先使用英文，以获得更稳定效果
 - 首次运行时会下载模型文件，耗时取决于网络环境
 - 输入图和输出图会自动按时间戳命名保存，避免文件覆盖
+- SQLite 数据库文件默认保存到 `data/database/app.db`
+- 数据库记录与 CSV 实验日志并存，CSV 仍保留用于实验整理
 - 服务器部署阶段建议优先使用 GPU 环境，CPU 仅适合基础验证

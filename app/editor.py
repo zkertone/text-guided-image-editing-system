@@ -6,6 +6,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageChops
 
+from app.history_manager import HistoryManager
+
 
 class ImageEditor:
     """A lightweight wrapper around the diffusion pipelines."""
@@ -21,6 +23,7 @@ class ImageEditor:
         self.input_dir = project_root / "data" / "input"
         self.output_dir = project_root / "data" / "output"
         self.log_csv_path = project_root / "docs" / "experiment_log.csv"
+        self.history_manager = HistoryManager()
         self.input_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.log_csv_path.parent.mkdir(parents=True, exist_ok=True)
@@ -266,6 +269,10 @@ class ImageEditor:
                 writer.writeheader()
             writer.writerow(row)
 
+    def get_recent_records(self, limit: int = 10) -> list[list]:
+        """Return recent edit records stored in SQLite."""
+        return self.history_manager.get_recent_records(limit=limit)
+
     def edit_image(
         self,
         input_image: Image.Image,
@@ -293,6 +300,7 @@ class ImageEditor:
         control_type = "not_applicable"
         control_image_path = ""
         control_image = None
+        mask = None
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         image = self.preprocess_image(input_image)
@@ -333,6 +341,47 @@ class ImageEditor:
             ).images[0]
 
         output_save_path = self._save_image(result, self.output_dir, "output")
+        input_image_id = self.history_manager.save_image(
+            image=image,
+            image_type="input",
+            file_name=input_save_path.name,
+        )
+        output_image_id = self.history_manager.save_image(
+            image=result,
+            image_type="output",
+            file_name=output_save_path.name,
+        )
+        mask_image_id = None
+        control_image_id = None
+
+        if mask is not None:
+            mask_image_id = self.history_manager.save_image(
+                image=mask,
+                image_type="mask",
+                file_name="mask.png",
+            )
+
+        if control_image is not None:
+            control_image_id = self.history_manager.save_image(
+                image=control_image,
+                image_type="control",
+                file_name=Path(control_image_path).name,
+            )
+
+        edit_record_id = self.history_manager.save_edit_record(
+            mode=mode,
+            prompt=prompt,
+            input_image_id=input_image_id,
+            mask_image_id=mask_image_id,
+            control_image_id=control_image_id,
+            output_image_id=output_image_id,
+            mask_source=mask_source,
+            control_type=control_type,
+            num_inference_steps=num_inference_steps,
+            image_guidance_scale=image_guidance_scale,
+            guidance_scale=guidance_scale,
+            status="success",
+        )
         self._append_experiment_log(
             mode=mode,
             mask_source=mask_source,
@@ -368,6 +417,7 @@ class ImageEditor:
             "mode": mode,
             "mask_source": mask_source,
             "control_type": control_type,
+            "edit_record_id": edit_record_id,
             "model_name": self.get_model_name(mode),
             "device": self.get_device_name(mode),
             "summary_text": summary_text,

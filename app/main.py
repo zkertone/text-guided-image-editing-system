@@ -1,5 +1,6 @@
 import os
 
+from app.database import init_database
 from app.editor import ImageEditor
 from app.pipeline_loader import load_instructpix2pix_pipeline
 from app.ui import create_ui
@@ -23,6 +24,8 @@ def get_launch_config():
 
 
 def main():
+    init_database()
+
     print("Loading InstructPix2Pix pipeline...")
     pipeline, device = load_instructpix2pix_pipeline()
     print(f"Pipeline loaded successfully. Running on device: {device}")
