@@ -141,6 +141,82 @@ class HistoryManager:
             for row in rows
         ]
 
+    def get_recent_input_images(self, limit: int = 10) -> list[list]:
+        """Return recent non-deleted input images for display in Gradio."""
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, file_name, created_at, width, height
+                FROM images
+                WHERE user_id = ?
+                    AND image_type = 'input'
+                    AND is_deleted = 0
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (self.user_id, int(limit)),
+            ).fetchall()
+
+        return [
+            [
+                row["id"],
+                row["file_name"],
+                row["created_at"],
+                row["width"],
+                row["height"],
+            ]
+            for row in rows
+        ]
+
+    def get_record_detail(self, record_id: int) -> Optional[dict]:
+        """Return one non-deleted edit record as a dictionary."""
+        with get_connection() as connection:
+            row = connection.execute(
+                """
+                SELECT *
+                FROM edit_records
+                WHERE id = ?
+                    AND user_id = ?
+                    AND is_deleted = 0
+                """,
+                (int(record_id), self.user_id),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return dict(row)
+
+    def get_record_images(self, record_id: int) -> dict:
+        """Load images linked to one edit record."""
+        detail = self.get_record_detail(record_id)
+        images = {
+            "input": None,
+            "mask": None,
+            "control": None,
+            "output": None,
+        }
+
+        if detail is None:
+            return images
+
+        image_fields = {
+            "input": detail.get("input_image_id"),
+            "mask": detail.get("mask_image_id"),
+            "control": detail.get("control_image_id"),
+            "output": detail.get("output_image_id"),
+        }
+
+        for image_type, image_id in image_fields.items():
+            if image_id is None:
+                continue
+            try:
+                images[image_type] = self.load_image(image_id)
+            except ValueError:
+                images[image_type] = None
+
+        return images
+
     def load_image(self, image_id: int) -> Image.Image:
         """Load an image BLOB from SQLite as a PIL image."""
         with get_connection() as connection:
@@ -156,4 +232,38 @@ class HistoryManager:
         if row is None:
             raise ValueError(f"Image not found: {image_id}")
 
-        return Image.open(BytesIO(row["image_data"])).convert("RGB")
+        image = Image.open(BytesIO(row["image_data"])).convert("RGB")
+        image.load()
+        return image
+
+    def soft_delete_record(self, record_id: int) -> bool:
+        """Mark one edit record as deleted without removing it physically."""
+        with get_connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE edit_records
+                SET is_deleted = 1
+                WHERE id = ?
+                    AND user_id = ?
+                    AND is_deleted = 0
+                """,
+                (int(record_id), self.user_id),
+            )
+            connection.commit()
+            return cursor.rowcount > 0
+
+    def soft_delete_image(self, image_id: int) -> bool:
+        """Mark one image as deleted without removing the BLOB physically."""
+        with get_connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE images
+                SET is_deleted = 1
+                WHERE id = ?
+                    AND user_id = ?
+                    AND is_deleted = 0
+                """,
+                (int(image_id), self.user_id),
+            )
+            connection.commit()
+            return cursor.rowcount > 0

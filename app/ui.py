@@ -46,6 +46,104 @@ def create_ui(image_editor):
             return None
         return input_image
 
+    def get_record_id(value):
+        if value is None:
+            raise ValueError("请输入记录 ID。")
+        return int(value)
+
+    def get_image_id(value):
+        if value is None:
+            raise ValueError("请输入图片 ID。")
+        return int(value)
+
+    def format_record_detail(record):
+        if record is None:
+            return "未找到该记录，或该记录已被删除。"
+
+        fields = [
+            ("id", record.get("id")),
+            ("created_at", record.get("created_at")),
+            ("mode", record.get("mode")),
+            ("prompt", record.get("prompt")),
+            ("mask_source", record.get("mask_source")),
+            ("control_type", record.get("control_type")),
+            ("num_inference_steps", record.get("num_inference_steps")),
+            ("image_guidance_scale", record.get("image_guidance_scale")),
+            ("guidance_scale", record.get("guidance_scale")),
+            ("input_image_id", record.get("input_image_id")),
+            ("mask_image_id", record.get("mask_image_id")),
+            ("control_image_id", record.get("control_image_id")),
+            ("output_image_id", record.get("output_image_id")),
+            ("status", record.get("status")),
+            ("error_message", record.get("error_message") or ""),
+        ]
+        return "\n".join(f"{key}: {value}" for key, value in fields)
+
+    def view_history_record(record_id):
+        try:
+            record_id = get_record_id(record_id)
+            record = image_editor.history_manager.get_record_detail(record_id)
+            images = image_editor.history_manager.get_record_images(record_id)
+            return (
+                images["input"],
+                images["mask"],
+                images["control"],
+                images["output"],
+                format_record_detail(record),
+            )
+        except Exception as error:
+            return None, None, None, None, f"查看记录失败: {error}"
+
+    def load_history_input_image(image_id):
+        try:
+            image_id = get_image_id(image_id)
+            image = image_editor.history_manager.load_image(image_id)
+            return (
+                image,
+                image,
+                f"已加载历史输入图，image_id={image_id}",
+                image_editor.history_manager.get_recent_input_images(),
+            )
+        except Exception as error:
+            return (
+                gr.update(),
+                gr.update(),
+                f"加载历史输入图失败: {error}",
+                image_editor.history_manager.get_recent_input_images(),
+            )
+
+    def delete_history_record(record_id):
+        try:
+            record_id = get_record_id(record_id)
+            deleted = image_editor.history_manager.soft_delete_record(record_id)
+            if deleted:
+                message = f"已逻辑删除编辑记录，record_id={record_id}"
+            else:
+                message = "未找到该记录，或该记录已被删除。"
+            return message, image_editor.get_recent_records()
+        except Exception as error:
+            return f"删除记录失败: {error}", image_editor.get_recent_records()
+
+    def delete_history_image(image_id):
+        try:
+            image_id = get_image_id(image_id)
+            deleted = image_editor.history_manager.soft_delete_image(image_id)
+            if deleted:
+                message = f"已逻辑删除图片，image_id={image_id}"
+            else:
+                message = "未找到该图片，或该图片已被删除。"
+            return (
+                message,
+                image_editor.get_recent_records(),
+                image_editor.history_manager.get_recent_input_images(),
+            )
+        except Exception as error:
+            return (
+                f"删除图片失败: {error}",
+                image_editor.get_recent_records(),
+                image_editor.history_manager.get_recent_input_images(),
+            )
+
     def run_edit(
         mode,
         input_image,
@@ -58,18 +156,31 @@ def create_ui(image_editor):
         text_guidance,
     ):
         recent_records = image_editor.get_recent_records()
+        recent_input_images = image_editor.history_manager.get_recent_input_images()
 
         if input_image is None:
-            return None, None, "请先上传一张输入图片。", recent_records
+            return None, None, "请先上传一张输入图片。", recent_records, recent_input_images
 
         if not prompt or not prompt.strip():
-            return None, None, "请输入英文编辑指令。", recent_records
+            return None, None, "请输入英文编辑指令。", recent_records, recent_input_images
 
         if mode == "local_inpaint":
             if mask_source == "uploaded_mask" and uploaded_mask_image is None:
-                return None, None, "局部编辑模式下，请上传黑白 Mask 图。", recent_records
+                return (
+                    None,
+                    None,
+                    "局部编辑模式下，请上传黑白 Mask 图。",
+                    recent_records,
+                    recent_input_images,
+                )
             if mask_source == "drawn_mask" and drawn_mask_data is None:
-                return None, None, "局部编辑模式下，请先在线绘制 Mask。", recent_records
+                return (
+                    None,
+                    None,
+                    "局部编辑模式下，请先在线绘制 Mask。",
+                    recent_records,
+                    recent_input_images,
+                )
 
         result = image_editor.edit_image(
             input_image=input_image,
@@ -88,6 +199,7 @@ def create_ui(image_editor):
             result["control_image"],
             result["summary_text"],
             image_editor.get_recent_records(),
+            image_editor.history_manager.get_recent_input_images(),
         )
 
     with gr.Blocks() as demo:
@@ -233,6 +345,43 @@ def create_ui(image_editor):
                     interactive=False,
                 )
 
+        with gr.Accordion("历史记录管理", open=False):
+            gr.Markdown("### 查看历史记录")
+            with gr.Row():
+                view_record_id = gr.Number(label="编辑记录 ID", precision=0)
+                view_record_button = gr.Button("查看记录")
+
+            with gr.Row():
+                history_input_image = gr.Image(type="pil", label="历史输入图")
+                history_mask_image = gr.Image(type="pil", label="历史 Mask 图")
+                history_control_image = gr.Image(type="pil", label="历史 Canny 图")
+                history_output_image = gr.Image(type="pil", label="历史输出图")
+
+            history_detail_text = gr.Textbox(label="历史记录详情", lines=14)
+
+            gr.Markdown("### 复用历史输入图")
+            recent_input_images = gr.Dataframe(
+                headers=["id", "file_name", "created_at", "width", "height"],
+                value=image_editor.history_manager.get_recent_input_images(),
+                datatype=["number", "str", "str", "number", "number"],
+                row_count=(10, "fixed"),
+                col_count=(5, "fixed"),
+                label="最近输入图片",
+                interactive=False,
+            )
+            with gr.Row():
+                load_image_id = gr.Number(label="输入图片 ID", precision=0)
+                load_image_button = gr.Button("加载为当前输入图")
+
+            gr.Markdown("### 逻辑删除")
+            with gr.Row():
+                delete_record_id = gr.Number(label="删除记录 ID", precision=0)
+                delete_record_button = gr.Button("删除记录")
+                delete_image_id = gr.Number(label="删除图片 ID", precision=0)
+                delete_image_button = gr.Button("删除图片")
+
+            history_status = gr.Textbox(label="历史记录操作提示", lines=3)
+
         mode.change(
             fn=update_ui_by_mode,
             inputs=[mode, mask_source],
@@ -290,7 +439,48 @@ def create_ui(image_editor):
                 image_guidance,
                 text_guidance,
             ],
-            outputs=[output_image, canny_preview, info_text, recent_records],
+            outputs=[
+                output_image,
+                canny_preview,
+                info_text,
+                recent_records,
+                recent_input_images,
+            ],
+        )
+
+        view_record_button.click(
+            fn=view_history_record,
+            inputs=view_record_id,
+            outputs=[
+                history_input_image,
+                history_mask_image,
+                history_control_image,
+                history_output_image,
+                history_detail_text,
+            ],
+        )
+
+        load_image_button.click(
+            fn=load_history_input_image,
+            inputs=load_image_id,
+            outputs=[
+                input_image,
+                drawn_mask,
+                history_status,
+                recent_input_images,
+            ],
+        )
+
+        delete_record_button.click(
+            fn=delete_history_record,
+            inputs=delete_record_id,
+            outputs=[history_status, recent_records],
+        )
+
+        delete_image_button.click(
+            fn=delete_history_image,
+            inputs=delete_image_id,
+            outputs=[history_status, recent_records, recent_input_images],
         )
 
     return demo

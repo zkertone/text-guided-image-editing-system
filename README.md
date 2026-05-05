@@ -17,10 +17,11 @@
 - 使用 Gradio 提供可视化交互界面
 - 支持上传 Mask 图与在线绘制 Mask 两种局部编辑方式
 - 使用 SQLite 保存图片 BLOB 与编辑记录
+- 支持查看历史记录图片组、复用历史输入图和逻辑删除记录
 - 将实验 notebook 中已验证的代码整理为清晰的工程结构
 
 说明：
-当前版本聚焦课程题目相关功能，仅包含 SQLite 基础数据记录，不包含用户登录、权限管理或复杂后台服务。
+当前版本聚焦课程题目相关功能，仅包含 SQLite 基础数据记录与简单历史记录管理，不包含用户登录、权限管理或复杂后台服务。
 
 ## 2. 项目结构
 
@@ -128,6 +129,9 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 - 自动追加实验记录到 `docs/experiment_log.csv`
 - 自动将图片 BLOB 和编辑任务记录保存到 `data/database/app.db`
 - 在界面中展示最近 10 条编辑记录
+- 支持按记录 ID 查看历史输入图、Mask 图、Canny 控制图和输出图
+- 支持按图片 ID 将历史输入图加载为当前输入图
+- 支持对编辑记录和图片进行逻辑删除
 
 ## 8. 模块说明
 
@@ -137,7 +141,7 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 
 ### `app/history_manager.py`
 
-负责将图片保存到数据库、记录编辑任务以及查询最近编辑记录。
+负责将图片保存到数据库、记录编辑任务、查询历史记录、读取历史图片以及执行逻辑删除。
 
 ### `app/pipeline_loader.py`
 
@@ -171,4 +175,5 @@ GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 python -m app.main
 - 输入图和输出图会自动按时间戳命名保存，避免文件覆盖
 - SQLite 数据库文件默认保存到 `data/database/app.db`
 - 数据库记录与 CSV 实验日志并存，CSV 仍保留用于实验整理
+- 删除记录和删除图片均采用逻辑删除，不会物理移除 SQLite 中的记录
 - 服务器部署阶段建议优先使用 GPU 环境，CPU 仅适合基础验证
