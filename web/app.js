@@ -1,10 +1,16 @@
-const API_BASE = window.API_BASE || "http://localhost:8000";
+const DEFAULT_API_BASE = "http://localhost:8000";
+let apiBase = normalizeApiBase(
+  localStorage.getItem("backendApiBase") || window.API_BASE || DEFAULT_API_BASE
+);
 
 let loadedImageBlob = null;
 let loadedImageName = "history_input.png";
 
 const elements = {
   serverStatus: document.getElementById("serverStatus"),
+  apiBaseInput: document.getElementById("apiBaseInput"),
+  saveApiBaseButton: document.getElementById("saveApiBaseButton"),
+  testApiBaseButton: document.getElementById("testApiBaseButton"),
   editForm: document.getElementById("editForm"),
   mode: document.getElementById("mode"),
   imageInput: document.getElementById("imageInput"),
@@ -39,8 +45,17 @@ const elements = {
   deleteStatus: document.getElementById("deleteStatus"),
 };
 
+function normalizeApiBase(value) {
+  const trimmed = (value || DEFAULT_API_BASE).trim();
+  return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
+}
+
+function getApiBase() {
+  return apiBase;
+}
+
 function apiUrl(path) {
-  return `${API_BASE}${path}`;
+  return `${getApiBase()}${path}`;
 }
 
 function setImage(img, url) {
@@ -76,9 +91,31 @@ async function fetchJson(path, options = {}) {
 async function checkHealth() {
   try {
     const data = await fetchJson("/api/health");
-    elements.serverStatus.textContent = `后端状态：${data.status}`;
+    elements.serverStatus.textContent = `连接状态：后端连接成功 (${data.status})`;
   } catch (error) {
-    elements.serverStatus.textContent = `后端状态：连接失败 (${error.message})`;
+    elements.serverStatus.textContent = "连接状态：后端连接失败，请检查地址或后端服务";
+  }
+}
+
+function saveApiBase() {
+  apiBase = normalizeApiBase(elements.apiBaseInput.value);
+  elements.apiBaseInput.value = apiBase;
+  localStorage.setItem("backendApiBase", apiBase);
+  elements.serverStatus.textContent = "连接状态：后端地址已保存";
+}
+
+async function testApiBase() {
+  apiBase = normalizeApiBase(elements.apiBaseInput.value);
+  elements.apiBaseInput.value = apiBase;
+  try {
+    const response = await fetch(`${apiBase}/api/health`);
+    if (!response.ok) {
+      throw new Error("health check failed");
+    }
+    localStorage.setItem("backendApiBase", apiBase);
+    elements.serverStatus.textContent = "连接状态：后端连接成功";
+  } catch (error) {
+    elements.serverStatus.textContent = "连接状态：后端连接失败，请检查地址或后端服务";
   }
 }
 
@@ -255,6 +292,8 @@ async function deleteImage() {
 }
 
 elements.mode.addEventListener("change", updateModeControls);
+elements.saveApiBaseButton.addEventListener("click", saveApiBase);
+elements.testApiBaseButton.addEventListener("click", testApiBase);
 elements.imageInput.addEventListener("change", () => {
   const file = elements.imageInput.files[0];
   loadedImageBlob = null;
@@ -269,6 +308,7 @@ elements.loadInputButton.addEventListener("click", loadInputImage);
 elements.deleteRecordButton.addEventListener("click", deleteRecord);
 elements.deleteImageButton.addEventListener("click", deleteImage);
 
+elements.apiBaseInput.value = apiBase;
 updateModeControls();
 checkHealth();
 refreshHistory();

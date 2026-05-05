@@ -12,7 +12,15 @@
         <h1>文字驱动图像编辑系统</h1>
         <p>当前用户：demo_user</p>
       </div>
-      <div class="status" id="serverStatus">后端状态：检查中</div>
+      <div class="backend-settings">
+        <label>
+          后端 API 地址
+          <input id="apiBaseInput" type="text" placeholder="https://xxxx.trycloudflare.com" />
+        </label>
+        <button id="saveApiBaseButton" type="button">保存后端地址</button>
+        <button id="testApiBaseButton" type="button">测试连接</button>
+        <div class="status" id="serverStatus">连接状态：检查中</div>
+      </div>
     </header>
 
     <main class="layout">

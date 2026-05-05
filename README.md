@@ -148,6 +148,23 @@ uvicorn app.server:app --host 0.0.0.0 --port 8000
 
 前端可以部署在本地或普通 Web 服务器中，并通过 API 地址访问后端。
 
+### 6.1 Colab + cloudflared 后端地址配置
+
+如果 FastAPI 后端运行在 Colab GPU 环境中，可以通过 cloudflared 获取临时公网地址，例如：
+
+```text
+https://xxxx.trycloudflare.com
+```
+
+打开 Web 前端页面后，在顶部“后端 API 地址”输入框中粘贴该地址，然后点击：
+
+```text
+保存后端地址
+测试连接
+```
+
+前端会将该地址保存到浏览器 `localStorage` 中，页面刷新后仍会继续使用上次保存的后端地址。这样 Colab 重新启动后，只需要在页面中更新新的 cloudflared 地址，不需要再修改 `web/app.js`。
+
 ## 7. 当前 V1 功能
 
 - 上传输入图像
@@ -171,6 +188,7 @@ uvicorn app.server:app --host 0.0.0.0 --port 8000
 - 支持按图片 ID 将历史输入图加载为当前输入图
 - 支持对编辑记录和图片进行逻辑删除
 - FastAPI 服务端提供编辑、图片读取、历史记录查询和逻辑删除接口
+- Web 用户端支持在页面中配置后端 API 地址，适合连接 Colab cloudflared 临时公网后端
 
 ## 8. 模块说明
 
@@ -226,4 +244,5 @@ FastAPI 服务端入口，负责初始化数据库、加载模型管线，并向
 - 数据库记录与 CSV 实验日志并存，CSV 仍保留用于实验整理
 - 删除记录和删除图片均采用逻辑删除，不会物理移除 SQLite 中的记录
 - Colab 可用于运行后端 GPU 推理，前端可运行在本地或普通云服务器中
+- Colab 后端公网地址变化时，可直接在前端页面顶部更新“后端 API 地址”
 - 服务器部署阶段建议优先使用 GPU 环境，CPU 仅适合基础验证

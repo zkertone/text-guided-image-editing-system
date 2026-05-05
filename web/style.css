@@ -36,6 +36,27 @@ body {
   font-size: 14px;
 }
 
+.backend-settings {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 140px 120px;
+  gap: 10px;
+  align-items: end;
+  width: min(760px, 100%);
+}
+
+.backend-settings label {
+  margin: 0;
+}
+
+.backend-settings input,
+.backend-settings button {
+  margin-top: 6px;
+}
+
+.backend-settings .status {
+  grid-column: 1 / -1;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(320px, 480px) minmax(420px, 1fr);
@@ -189,6 +210,13 @@ tr:hover {
   .topbar,
   .layout {
     display: block;
+  }
+
+  .backend-settings {
+    display: grid;
+    grid-template-columns: 1fr;
+    margin-top: 14px;
+    width: 100%;
   }
 
   .panel {
